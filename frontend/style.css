@@ -8,6 +8,36 @@ body {
   display: flex; width: 100vw; height: 100vh;
 }
 
+.hidden { display: none !important; }
+
+/* ── Login ──────────────────────────────────────────── */
+#loginScreen {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: #080B16;
+}
+.login-box {
+  background: #0B0F1E; border: 1px solid #1F2A44; border-radius: 16px;
+  padding: 40px; width: 320px; text-align: center;
+}
+.login-logo { font-size: 22px; font-weight: 700; letter-spacing: 4px; color: #5B9CFF; }
+.login-sub { font-size: 12px; color: #5C6B86; margin: 6px 0 24px; }
+.login-box input {
+  width: 100%; background: #11172F; border: 1px solid #1F2A44; border-radius: 10px;
+  padding: 12px 14px; color: #E6ECF8; font-size: 14px; outline: none;
+  transition: border-color .15s;
+}
+.login-box input:focus { border-color: #5B9CFF66; }
+.login-box button {
+  width: 100%; margin-top: 12px; background: #5B9CFF; color: #fff;
+  border: none; border-radius: 10px; padding: 12px; font-size: 14px;
+  font-weight: 600; cursor: pointer; transition: background .15s;
+}
+.login-box button:hover { background: #4A8AE8; }
+#loginError {
+  margin-top: 10px; color: #FF6B6B; font-size: 12px;
+}
+
 /* ── Sidebar ──────────────────────────────────────── */
 #sidebar {
   width: 300px; min-width: 260px;
@@ -15,11 +45,19 @@ body {
   display: flex; flex-direction: column;
 }
 #sidebar header {
-  padding: 20px 18px 14px;
+  padding: 16px 18px 12px;
   border-bottom: 1px solid #1F2A44;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
 }
 #sidebar .logo { font-size: 18px; font-weight: 700; letter-spacing: 3px; color: #5B9CFF; }
-#sidebar .subtitle { font-size: 11px; color: #5C6B86; margin-top: 2px; }
+#sidebar .subtitle { font-size: 11px; color: #5C6B86; margin-top: 2px; width: 100%; }
+
+.logout-btn {
+  background: transparent; border: 1px solid #1F2A44; border-radius: 8px;
+  color: #5C6B86; font-size: 10px; padding: 4px 10px; cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.logout-btn:hover { color: #FF6B6B; border-color: #FF6B6B44; }
 
 #convList {
   flex: 1; overflow-y: auto; padding: 8px;
@@ -31,22 +69,38 @@ body {
 }
 .conv:hover { background: #11172F; }
 .conv.active { background: #131B36; border-color: #5B9CFF33; }
+.conv.closed { opacity: 0.5; }
+.conv.closed.active { opacity: 1; }
 .conv-top { display: flex; justify-content: space-between; align-items: center; }
 .conv-id { font-size: 12px; font-weight: 600; color: #8FA0BF; }
-.conv-time { font-size: 10px; color: #5C6B86; }
 .conv-reg { font-size: 10px; color: #5C6B86; margin-top: 2px; }
 .conv-preview { font-size: 12px; color: #8FA0BF; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .conv-count { font-size: 10px; color: #5C6B86; margin-top: 4px; }
+
+.conv-status { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+.conv-status.open { color: #3DD68C; background: rgba(61,214,140,0.1); }
+.conv-status.closed { color: #FF6B6B; background: rgba(255,107,107,0.1); }
 
 /* ── Main panel ───────────────────────────────────── */
 #main {
   flex: 1; display: flex; flex-direction: column; min-width: 0;
 }
 #chatHeader {
-  padding: 16px 24px; border-bottom: 1px solid #1F2A44; flex-shrink: 0;
+  padding: 14px 24px; border-bottom: 1px solid #1F2A44; flex-shrink: 0;
 }
 .chat-id { font-size: 12px; color: #5C6B86; }
 .chat-id strong { color: #E6ECF8; }
+
+.action-btn {
+  background: transparent; border: 1px solid #1F2A44; border-radius: 8px;
+  color: #8FA0BF; font-size: 11px; padding: 6px 14px; cursor: pointer;
+  font-weight: 600; transition: all .15s; white-space: nowrap;
+}
+.action-btn:hover { background: #11172F; border-color: #5B9CFF44; color: #E6ECF8; }
+.action-btn.danger { color: #FF6B6B; border-color: rgba(255,107,107,0.2); }
+.action-btn.danger:hover { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.4); }
+.action-btn.warning { color: #FFB347; border-color: rgba(255,179,71,0.2); }
+.action-btn.warning:hover { background: rgba(255,179,71,0.1); border-color: rgba(255,179,71,0.4); }
 
 #messages {
   flex: 1; overflow-y: auto; padding: 16px 24px;

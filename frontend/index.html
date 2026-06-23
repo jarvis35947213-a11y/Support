@@ -8,21 +8,36 @@
 </head>
 <body>
 <div id="app">
-  <div id="sidebar">
-    <header>
-      <div class="logo">J A R V I S</div>
-      <div class="subtitle">Support Dashboard</div>
-    </header>
-    <div id="convList"></div>
-  </div>
-  <div id="main">
-    <div id="chatHeader"></div>
-    <div id="messages"></div>
-    <div id="composeBar" class="hidden">
-      <textarea id="replyInput" placeholder="Напишите ответ поддержки…"></textarea>
-      <button id="sendReply">Отправить</button>
+  <!-- Login screen -->
+  <div id="loginScreen" class="hidden">
+    <div class="login-box">
+      <div class="login-logo">J A R V I S</div>
+      <div class="login-sub">Support Dashboard</div>
+      <input id="loginPw" type="password" placeholder="Пароль" autocomplete="off">
+      <button id="loginBtn">Войти</button>
+      <div id="loginError" class="hidden"></div>
     </div>
-    <div id="emptyMsg">Выберите обращение слева</div>
+  </div>
+
+  <!-- Main app -->
+  <div id="mainApp" class="hidden">
+    <div id="sidebar">
+      <header>
+        <div class="logo">J A R V I S</div>
+        <div class="subtitle">Support Dashboard</div>
+        <button id="logoutBtn" class="logout-btn">Выйти</button>
+      </header>
+      <div id="convList"></div>
+    </div>
+    <div id="main">
+      <div id="chatHeader"></div>
+      <div id="messages"></div>
+      <div id="composeBar" class="hidden">
+        <textarea id="replyInput" placeholder="Напишите ответ поддержки…"></textarea>
+        <button id="sendReply">Отправить</button>
+      </div>
+      <div id="emptyMsg">Выберите обращение слева</div>
+    </div>
   </div>
 </div>
 
@@ -30,9 +45,17 @@
 const API_BASE = "/api";
 let selectedClientId = null;
 let pollInterval = null;
+let authToken = localStorage.getItem("jarvis_support_token") || "";
+
+function setToken(t) {
+  authToken = t;
+  if (t) localStorage.setItem("jarvis_support_token", t);
+  else localStorage.removeItem("jarvis_support_token");
+}
 
 async function api(method, path, body) {
   const opts = { method, headers: {"Content-Type":"application/json"} };
+  if (authToken) opts.headers["Authorization"] = "Bearer " + authToken;
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(API_BASE + path, opts);
   return r.json();
@@ -62,19 +85,66 @@ function truncate(s, n) {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
+// ── Auth ──
+async function checkAuth() {
+  if (!authToken) return false;
+  const r = await api("GET", "/conversations");
+  return !r.error;
+}
+
+function showLogin() {
+  document.getElementById("loginScreen").classList.remove("hidden");
+  document.getElementById("mainApp").classList.add("hidden");
+}
+
+function showApp() {
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("mainApp").classList.remove("hidden");
+}
+
+document.getElementById("loginBtn").onclick = async () => {
+  const pw = document.getElementById("loginPw").value;
+  const err = document.getElementById("loginError");
+  const r = await api("POST", "/login", {password: pw});
+  if (r.ok) {
+    setToken(r.token);
+    err.classList.add("hidden");
+    showApp();
+    loadConversations();
+  } else {
+    err.textContent = "Неверный пароль";
+    err.classList.remove("hidden");
+  }
+};
+
+document.getElementById("loginPw").onkeydown = (e) => {
+  if (e.key === "Enter") document.getElementById("loginBtn").click();
+};
+
+document.getElementById("logoutBtn").onclick = () => {
+  setToken("");
+  if (pollInterval) clearInterval(pollInterval);
+  selectedClientId = null;
+  showLogin();
+};
+
+// ── Conversations list ──
 async function loadConversations() {
   const convs = await api("GET", "/conversations");
+  if (convs.error) { showLogin(); return; }
   const list = document.getElementById("convList");
   list.innerHTML = "";
   for (const c of convs) {
     const div = document.createElement("div");
     div.className = "conv" + (c.client_id === selectedClientId ? " active" : "");
+    if (c.status === "closed") div.className += " closed";
     const shortId = c.client_id.length > 8 ? c.client_id.slice(0, 8) + "…" : c.client_id;
+    const statusLabel = c.status === "closed" ? "✕ Закрыто" : "○ Открыто";
 
     div.innerHTML = `
       <div class="conv-top">
         <span class="conv-id">${shortId}</span>
-        <span class="conv-time">${formatTs(c.last_ts)}</span>
+        <span class="conv-status ${c.status}">${statusLabel}</span>
       </div>
       <div class="conv-reg">Регистрация: ${formatDate(c.registered_at)}</div>
       <div class="conv-preview">${truncate(c.preview, 50) || "(нет сообщений)"}</div>
@@ -86,19 +156,61 @@ async function loadConversations() {
   }
 }
 
+// ── Select conversation ──
 async function selectConversation(clientId) {
   selectedClientId = clientId;
   document.getElementById("emptyMsg").classList.add("hidden");
   document.getElementById("messages").classList.remove("hidden");
   document.getElementById("composeBar").classList.remove("hidden");
-  document.getElementById("chatHeader").innerHTML =
-    `<div class="chat-id">Клиент: <strong>${clientId}</strong></div>`;
+
+  // Fetch full conversation detail for status
+  const convs = await api("GET", "/conversations");
+  const conv = convs.find(c => c.client_id === clientId);
+  const status = conv ? conv.status : "open";
+
+  document.getElementById("chatHeader").innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div class="chat-id">Клиент: <strong>${clientId}</strong>
+        <span class="conv-status ${status}" style="margin-left:10px">${status === "closed" ? "✕ Закрыто" : "○ Открыто"}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button id="clearChatBtn" class="action-btn danger">Очистить чат</button>
+        ${status === "closed"
+          ? `<button id="reopenBtn" class="action-btn">Открыть заново</button>`
+          : `<button id="closeBtn" class="action-btn warning">Закрыть обращение</button>`
+        }
+      </div>
+    </div>
+  `;
+
+  document.getElementById("clearChatBtn").onclick = async () => {
+    if (!confirm("Очистить все сообщения в этом чате?")) return;
+    await api("DELETE", "/messages/" + clientId);
+    loadMessages(clientId);
+    loadConversations();
+  };
+
+  const closeBtn = document.getElementById("closeBtn");
+  if (closeBtn) closeBtn.onclick = async () => {
+    await api("POST", "/conversations/" + clientId + "/close");
+    selectConversation(clientId);
+    loadConversations();
+  };
+
+  const reopenBtn = document.getElementById("reopenBtn");
+  if (reopenBtn) reopenBtn.onclick = async () => {
+    await api("POST", "/conversations/" + clientId + "/reopen");
+    selectConversation(clientId);
+    loadConversations();
+  };
+
   loadMessages(clientId);
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(() => loadMessages(clientId, true), 3000);
   loadConversations();
 }
 
+// ── Messages ──
 async function loadMessages(clientId, silent) {
   if (!clientId) return;
   const msgs = await api("GET", "/messages/" + clientId);
@@ -145,7 +257,14 @@ document.getElementById("replyInput").onkeydown = (e) => {
   }
 };
 
-loadConversations();
+// ── Init ──
+(async () => {
+  if (authToken) {
+    const ok = await checkAuth();
+    if (ok) { showApp(); loadConversations(); return; }
+  }
+  showLogin();
+})();
 </script>
 </body>
 </html>
