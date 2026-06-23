@@ -4,7 +4,10 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder="../frontend")
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_FRONTEND = os.path.join(_ROOT, "frontend")
+
+app = Flask(__name__, static_folder=_FRONTEND, static_url_path="")
 CORS(app)
 
 # Хранилище сообщений (в памяти — переживает только один инстанс)
@@ -58,12 +61,12 @@ def clear_messages():
 # Раздача фронтенда
 @app.route("/")
 def index():
-    return send_from_directory("../frontend", "index.html")
+    return send_from_directory(_FRONTEND, "index.html")
 
 
 @app.route("/<path:path>")
 def static_files(path):
-    return send_from_directory("../frontend", path)
+    return send_from_directory(_FRONTEND, path)
 
 
 if __name__ == "__main__":
