@@ -6,7 +6,7 @@
   "deploy": {
     "numReplicas": 1,
     "startCommand": "python backend/main.py",
-    "healthcheckPath": "/api/messages",
+    "healthcheckPath": "/",
     "restartPolicyType": "ON_FAILURE"
   }
 }
