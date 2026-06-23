@@ -8,69 +8,144 @@
 </head>
 <body>
 <div id="app">
-  <header>
-    <div class="logo">J A R V I S</div>
-    <div class="subtitle">Support Dashboard</div>
-    <div class="badge" id="badge">0</div>
-  </header>
-
-  <div id="toolbar">
-    <button id="refreshBtn" onclick="load()">⟳ Обновить</button>
-    <button id="clearBtn" onclick="clearAll()">✕ Очистить всё</button>
+  <div id="sidebar">
+    <header>
+      <div class="logo">J A R V I S</div>
+      <div class="subtitle">Support Dashboard</div>
+    </header>
+    <div id="convList"></div>
   </div>
-
-  <div id="messages"></div>
+  <div id="main">
+    <div id="chatHeader"></div>
+    <div id="messages"></div>
+    <div id="composeBar" class="hidden">
+      <textarea id="replyInput" placeholder="Напишите ответ поддержки…"></textarea>
+      <button id="sendReply">Отправить</button>
+    </div>
+    <div id="emptyMsg">Выберите обращение слева</div>
+  </div>
 </div>
 
 <script>
-const API = "/api/messages";
+const API_BASE = "/api";
+let selectedClientId = null;
+let pollInterval = null;
 
-async function load() {
-  try {
-    const r = await fetch(API);
-    const msgs = await r.json();
-    const container = document.getElementById("messages");
-    container.innerHTML = "";
-    document.getElementById("badge").textContent = msgs.length;
+async function api(method, path, body) {
+  const opts = { method, headers: {"Content-Type":"application/json"} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API_BASE + path, opts);
+  return r.json();
+}
 
-    for (const m of msgs) {
-      const div = document.createElement("div");
-      div.className = "msg " + (m.role === "user" ? "user" : "support");
+function formatTs(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts.slice(0, 16).replace("T", " ");
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit"
+  });
+}
 
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      const role = m.role === "user" ? "Пользователь" : "Поддержка";
-      const ts = m.ts ? m.ts.slice(0, 19).replace("T", " ") : "";
-      meta.textContent = role + " · " + ts;
+function formatDate(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts.slice(0, 10);
+  return d.toLocaleDateString("ru-RU", {
+    day: "2-digit", month: "2-digit", year: "numeric"
+  });
+}
 
-      const text = document.createElement("div");
-      text.className = "text";
-      text.textContent = m.text || "(пусто)";
+function truncate(s, n) {
+  if (!s) return "";
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
 
-      div.appendChild(meta);
-      div.appendChild(text);
-      container.appendChild(div);
-    }
+async function loadConversations() {
+  const convs = await api("GET", "/conversations");
+  const list = document.getElementById("convList");
+  list.innerHTML = "";
+  for (const c of convs) {
+    const div = document.createElement("div");
+    div.className = "conv" + (c.client_id === selectedClientId ? " active" : "");
+    const shortId = c.client_id.length > 8 ? c.client_id.slice(0, 8) + "…" : c.client_id;
 
-    window.scrollTo(0, document.body.scrollHeight);
-  } catch (e) {
-    document.getElementById("messages").innerHTML =
-      '<div class="error">Ошибка загрузки: ' + e.message + "</div>";
+    div.innerHTML = `
+      <div class="conv-top">
+        <span class="conv-id">${shortId}</span>
+        <span class="conv-time">${formatTs(c.last_ts)}</span>
+      </div>
+      <div class="conv-reg">Регистрация: ${formatDate(c.registered_at)}</div>
+      <div class="conv-preview">${truncate(c.preview, 50) || "(нет сообщений)"}</div>
+      <div class="conv-count">${c.count} сообщ.</div>
+    `;
+
+    div.onclick = () => selectConversation(c.client_id);
+    list.appendChild(div);
   }
 }
 
-async function clearAll() {
-  if (!confirm("Очистить все сообщения?")) return;
-  try {
-    await fetch(API, { method: "DELETE" });
-    load();
-  } catch (e) {
-    alert("Ошибка: " + e.message);
-  }
+async function selectConversation(clientId) {
+  selectedClientId = clientId;
+  document.getElementById("emptyMsg").classList.add("hidden");
+  document.getElementById("messages").classList.remove("hidden");
+  document.getElementById("composeBar").classList.remove("hidden");
+  document.getElementById("chatHeader").innerHTML =
+    `<div class="chat-id">Клиент: <strong>${clientId}</strong></div>`;
+  loadMessages(clientId);
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(() => loadMessages(clientId, true), 3000);
+  loadConversations();
 }
 
-load();
-setInterval(load, 5000);
+async function loadMessages(clientId, silent) {
+  if (!clientId) return;
+  const msgs = await api("GET", "/messages/" + clientId);
+  const container = document.getElementById("messages");
+  if (!silent) container.innerHTML = "";
+  const existing = container.querySelectorAll(".msg");
+  if (existing.length === msgs.length) return;
+
+  container.innerHTML = "";
+  for (const m of msgs) {
+    const div = document.createElement("div");
+    div.className = "msg " + (m.role === "support" ? "support" : "user");
+    const role = m.role === "user" ? "Пользователь" : "Поддержка";
+    div.innerHTML = `
+      <div class="meta">${role} · ${formatTs(m.ts)}</div>
+      <div class="text">${escapeHtml(m.text || "")}</div>
+    `;
+    container.appendChild(div);
+  }
+  container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+document.getElementById("sendReply").onclick = async () => {
+  const input = document.getElementById("replyInput");
+  const text = input.value.trim();
+  if (!text || !selectedClientId) return;
+  await api("POST", "/messages/" + selectedClientId, {
+    text: text, role: "support", ts: new Date().toISOString()
+  });
+  input.value = "";
+  loadMessages(selectedClientId);
+};
+
+document.getElementById("replyInput").onkeydown = (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById("sendReply").click();
+  }
+};
+
+loadConversations();
 </script>
 </body>
 </html>
