@@ -180,6 +180,30 @@ def _load_faq():
     except (FileNotFoundError, OSError):
         return ""
 
+def _suggest_with_ai(history):
+    last_err = None
+    for attempt in range(2):
+        try:
+            r = http.post(AI_URL, json={
+                "model": AI_MODEL,
+                "messages": [
+                    {"role": "system", "content": _build_system_prompt()},
+                    {"role": "user", "content": history.strip()},
+                ]
+            }, headers={
+                "Authorization": f"Bearer {AI_KEY}",
+                "Content-Type": "application/json"
+            }, timeout=15)
+            r.raise_for_status()
+            j = r.json()
+            suggestion = j.get("choices", [{}])[0].get("message", {}).get("content", "")
+            if suggestion.strip():
+                return suggestion.strip()
+        except Exception as e:
+            last_err = e
+    print(f"[suggest] AI failed after retry: {last_err}", flush=True)
+    return ""
+
 def _build_system_prompt():
     faq_text = _load_faq()
     base = (
@@ -218,23 +242,7 @@ def suggest_reply(client_id):
         role = "Пользователь" if m.get("role") == "user" else "Поддержка"
         history += f"{role}: {m.get('text', '')}\n"
 
-    try:
-        r = http.post(AI_URL, json={
-            "model": AI_MODEL,
-            "messages": [
-                {"role": "system", "content": _build_system_prompt()},
-                {"role": "user", "content": history.strip()},
-            ]
-        }, headers={
-            "Authorization": f"Bearer {AI_KEY}",
-            "Content-Type": "application/json"
-        }, timeout=15)
-        r.raise_for_status()
-        j = r.json()
-        suggestion = j.get("choices", [{}])[0].get("message", {}).get("content", "")
-    except Exception as e:
-        return jsonify({"error": str(e), "suggestion": "", "ok": False}), 500
-
+    suggestion = _suggest_with_ai(history)
     return jsonify({"suggestion": suggestion.strip(), "ok": True})
 
 # ── Раздача фронтенда ──
