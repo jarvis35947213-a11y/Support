@@ -3,6 +3,7 @@ import json
 import base64
 import hashlib
 import secrets
+import requests as http
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -165,6 +166,52 @@ def list_conversations():
         })
     result.sort(key=lambda c: c["last_ts"], reverse=True)
     return jsonify(result)
+
+# ── AI-подсказка ответа (Gemini через Polza.ai) ──
+AI_KEY = os.environ.get("GEMINI_API_KEY", "pza_MDZgRqsIDd-IdthdUYf5n3HVzpisuOuR")
+AI_URL = os.environ.get("GEMINI_API_URL", "https://polza.ai/api/v1/chat/completions")
+AI_MODEL = os.environ.get("GEMINI_MODEL", "google/gemini-3.1-flash-lite")
+
+SYSTEM_PROMPT = (
+    "Ты — ассистент поддержки Jarvis Desktop. "
+    "Ниже история переписки с пользователем. Напиши ВЕЖЛИВЫЙ и ПОЛЕЗНЫЙ ответ от лица поддержки "
+    "на РУССКОМ языке. Если проблема описана не полностью — предложи уточнить. "
+    "Не используй маркдаун. Ответ должен быть не длиннее 300 символов."
+)
+
+@app.route("/api/conversations/<client_id>/suggest", methods=["POST"])
+def suggest_reply(client_id):
+    auth_err = _check_auth_or_403()
+    if auth_err: return auth_err
+    data = _load()
+    conv = data.get("conversations", {}).get(client_id, {})
+    msgs = conv.get("messages", []) if isinstance(conv, dict) else (conv if isinstance(conv, list) else [])
+    if not msgs:
+        return jsonify({"suggestion": "", "ok": True})
+
+    history = ""
+    for m in msgs:
+        role = "Пользователь" if m.get("role") == "user" else "Поддержка"
+        history += f"{role}: {m.get('text', '')}\n"
+
+    try:
+        r = http.post(AI_URL, json={
+            "model": AI_MODEL,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": history.strip()},
+            ]
+        }, headers={
+            "Authorization": f"Bearer {AI_KEY}",
+            "Content-Type": "application/json"
+        }, timeout=15)
+        r.raise_for_status()
+        j = r.json()
+        suggestion = j.get("choices", [{}])[0].get("message", {}).get("content", "")
+    except Exception as e:
+        return jsonify({"error": str(e), "suggestion": "", "ok": False}), 500
+
+    return jsonify({"suggestion": suggestion.strip(), "ok": True})
 
 # ── Раздача фронтенда ──
 @app.route("/")

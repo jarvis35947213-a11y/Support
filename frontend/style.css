@@ -201,6 +201,33 @@ body {
   font-size: 9px; color: #5c5c70; margin-top: 2px; padding: 0 4px;
 }
 
+/* ── AI Suggest bar ────────────────────────────── */
+#suggestBar {
+  padding: 10px 16px 6px; flex-shrink: 0; background: #0e0e16;
+  border-top: 1px solid #1c1c28;
+}
+#suggestBar.hidden { display: none; }
+#suggestContent {
+  font-size: 12px; line-height: 1.5; color: #b0b0c0;
+  background: #1a1a28; border-radius: 10px; padding: 10px 14px;
+  margin-bottom: 8px; max-height: 80px; overflow-y: auto; white-space: pre-wrap;
+}
+#suggestContent::before { content: "🤖 "; }
+#suggestActions { display: flex; gap: 6px; justify-content: flex-end; }
+#suggestUseBtn {
+  background: #3DD68C; color: #0a0a0f; border: none; border-radius: 8px;
+  padding: 5px 14px; font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: background .15s;
+}
+#suggestUseBtn:hover { background: #2ec07a; }
+#suggestDismissBtn {
+  background: transparent; color: #5c5c70; border: 1px solid #2a2a3a; border-radius: 8px;
+  width: 28px; height: 28px; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s;
+}
+#suggestDismissBtn:hover { background: #1c1c28; color: #e8e8ed; }
+
 /* ── Compose bar ───────────────────────────────── */
 #composeBar {
   padding: 8px 16px 12px; border-top: 1px solid #1c1c28; flex-shrink: 0;

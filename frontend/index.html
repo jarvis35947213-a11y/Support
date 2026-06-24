@@ -65,6 +65,13 @@
       <div id="messageContainer">
         <div id="messages"></div>
       </div>
+      <div id="suggestBar" class="hidden">
+        <div id="suggestContent"></div>
+        <div id="suggestActions">
+          <button id="suggestUseBtn">Вставить ответ</button>
+          <button id="suggestDismissBtn">×</button>
+        </div>
+      </div>
       <div id="composeBar">
         <textarea id="replyInput" placeholder="Сообщение..." rows="1"></textarea>
         <button id="sendBtn" title="Отправить">
@@ -223,10 +230,37 @@ async function selectChat(id) {
   };
 
   loadMsgs(id);
+  fetchSuggest(id);
   if (poll) clearInterval(poll);
   poll = setInterval(function () { loadMsgs(id, true); }, 3000);
   loadConvs();
 }
+
+async function fetchSuggest(id) {
+  if (!id) return;
+  var bar = document.getElementById("suggestBar");
+  var content = document.getElementById("suggestContent");
+  content.textContent = "Думаю...";
+  bar.classList.remove("hidden");
+  var r = await api("POST", "/conversations/" + id + "/suggest");
+  if (r.ok && r.suggestion) {
+    content.textContent = r.suggestion;
+  } else {
+    bar.classList.add("hidden");
+  }
+}
+
+document.getElementById("suggestUseBtn").onclick = function () {
+  var text = document.getElementById("suggestContent").textContent;
+  if (text && text !== "Думаю...") {
+    document.getElementById("replyInput").value = text;
+    document.getElementById("replyInput").focus();
+    document.getElementById("suggestBar").classList.add("hidden");
+  }
+};
+document.getElementById("suggestDismissBtn").onclick = function () {
+  document.getElementById("suggestBar").classList.add("hidden");
+};
 
 // ── Messages ──
 async function loadMsgs(id, silent) {
