@@ -1,0 +1,17 @@
+{
+  "conversations": {
+    "test-faq-2": {
+      "messages": [
+        {
+          "text": "?????? ????? ??? ??????? Jarvis, ??? ???????",
+          "role": "user",
+          "ts": "2026-06-24T17:34:35.194524+00:00"
+        }
+      ],
+      "status": "open"
+    }
+  },
+  "registrations": {
+    "test-faq-2": "2026-06-24T17:34:35.189009+00:00"
+  }
+}
