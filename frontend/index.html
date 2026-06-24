@@ -104,6 +104,9 @@ async function api(m, p, b) {
   if (tok) o.headers["Authorization"] = "Bearer " + tok;
   if (b) o.body = JSON.stringify(b);
   var r = await fetch(API + p, o);
+  if (!r.ok) {
+    try { var err = await r.json(); if (err && err.error === "Unauthorized") { jwt(""); showLogin(); return null; } } catch(e) {}
+  }
   return r.json();
 }
 
@@ -247,14 +250,16 @@ async function fetchSuggest(id) {
   bar.classList.remove("hidden");
   var r = await api("POST", "/conversations/" + id + "/suggest");
   if (selectedId !== id) return;
-  if (r && r.suggestion) {
+  if (!r) { bar.classList.add("hidden"); return; }
+  if (r.error === "Unauthorized") { jwt(""); showLogin(); return; }
+  if (r.suggestion) {
     content.textContent = r.suggestion;
     actions.style.display = "flex";
-  } else if (r && r.ok) {
+  } else if (r.ok) {
     content.textContent = "Нет подсказки для этого обращения";
     actions.style.display = "none";
   } else {
-    content.textContent = "Не удалось получить подсказку. Нажмите × и попробуйте позже.";
+    content.textContent = "Не удалось получить подсказку.";
     actions.style.display = "none";
   }
 }

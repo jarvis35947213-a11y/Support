@@ -16,7 +16,7 @@ CORS(app)
 
 DATA_FILE = os.environ.get("DATA_FILE", "/tmp/support_data.json")
 PASSWORD = "Yfep2224"
-SECRET_KEY = secrets.token_hex(32)
+TOKEN_HASH = hashlib.sha256(PASSWORD.encode()).hexdigest()
 
 def _load():
     try:
@@ -31,8 +31,7 @@ def _save(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def _make_token():
-    raw = f"{PASSWORD}:{SECRET_KEY}"
-    return base64.b64encode(hashlib.sha256(raw.encode()).hexdigest().encode()).decode()
+    return base64.b64encode(hashlib.sha256(PASSWORD.encode()).hexdigest().encode()).decode()
 
 def _check_auth():
     auth = request.headers.get("Authorization", "")
@@ -144,6 +143,8 @@ def reopen_conversation(client_id):
 # ── Список всех обращений ──
 @app.route("/api/conversations", methods=["GET"])
 def list_conversations():
+    auth_err = _check_auth_or_403()
+    if auth_err: return auth_err
     data = _load()
     convs = data.get("conversations", {})
     regs = data.get("registrations", {})
