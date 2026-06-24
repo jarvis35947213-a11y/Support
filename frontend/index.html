@@ -229,7 +229,8 @@ async function selectChat(id) {
     loadConvs();
   };
 
-  loadMsgs(id);
+  document.getElementById("suggestBar").classList.add("hidden");
+  await loadMsgs(id);
   fetchSuggest(id);
   if (poll) clearInterval(poll);
   poll = setInterval(function () { loadMsgs(id, true); }, 3000);
@@ -240,13 +241,21 @@ async function fetchSuggest(id) {
   if (!id) return;
   var bar = document.getElementById("suggestBar");
   var content = document.getElementById("suggestContent");
+  var actions = document.getElementById("suggestActions");
   content.textContent = "Думаю...";
+  actions.style.display = "none";
   bar.classList.remove("hidden");
   var r = await api("POST", "/conversations/" + id + "/suggest");
-  if (r.ok && r.suggestion) {
+  if (selectedId !== id) return;
+  if (r && r.suggestion) {
     content.textContent = r.suggestion;
+    actions.style.display = "flex";
+  } else if (r && r.ok) {
+    content.textContent = "Нет подсказки для этого обращения";
+    actions.style.display = "none";
   } else {
-    bar.classList.add("hidden");
+    content.textContent = "Не удалось получить подсказку. Нажмите × и попробуйте позже.";
+    actions.style.display = "none";
   }
 }
 
